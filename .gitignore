@@ -1,0 +1,17 @@
+local_files/
+data/
+*.csv
+
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+
+.venv/
+venv/
+env/
+
+.vscode/
+.idea/
+.claude/
+
+*.log
