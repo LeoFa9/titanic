@@ -6,10 +6,7 @@ from sklearn.model_selection import ParameterGrid, StratifiedKFold
 
 
 def cross_validate_model(model, X, y, n_splits=5, random_state=42):
-    """Считает accuracy модели по StratifiedKFold, возвращает массив скоров по фолдам.
-    Копирует модель через copy.deepcopy вместо sklearn.base.clone: clone сравнивает параметры
-    по identity после реконструкции объекта, а у CatBoost с cat_features это падает с ошибкой
-    (конструктор делает копию списка cat_features), deepcopy такой проверки не делает"""
+    """Считает accuracy модели по StratifiedKFold, возвращает массив скоров по фолдам"""
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     scores = []
 
@@ -51,8 +48,10 @@ def tune_hyperparameters(name, model_ctor, param_grid, X, y, results, n_splits=5
 
 
 def train_kfold_and_predict(model, X, y, X_test, n_splits=5, random_state=42):
-    """Обучает по одной модели на train-части каждого фолда и усредняет предсказанные
-    вероятности класса 1 на X_test, используется для итогового сабмита"""
+    """Обучает по одной модели на train-части каждого фолда и усредняет предсказания на X_test
+    по фолдам, используется для итогового сабмита. Усредняет вероятности класса 1, если модель их
+    умеет считать (predict_proba), иначе усредняет предсказанные классы (например, VotingClassifier
+    с voting='hard' предсказывает только классы)"""
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     test_proba = np.zeros(len(X_test))
 
@@ -62,6 +61,10 @@ def train_kfold_and_predict(model, X, y, X_test, n_splits=5, random_state=42):
         # и для некоторых моделей (например, с warm_start=True) это испортило бы независимость фолдов.
         fold_model = copy.deepcopy(model)
         fold_model.fit(X.iloc[train_idx], y.iloc[train_idx])
-        test_proba += fold_model.predict_proba(X_test)[:, 1] / n_splits
+        if hasattr(fold_model, 'predict_proba'):
+            fold_pred = fold_model.predict_proba(X_test)[:, 1]
+        else:
+            fold_pred = fold_model.predict(X_test)
+        test_proba += fold_pred / n_splits
 
     return (test_proba >= 0.5).astype(int)

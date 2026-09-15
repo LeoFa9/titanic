@@ -1,3 +1,10 @@
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+
+CATEGORICAL_COLS = ['Pclass', 'Embarked', 'Title']
+SCALE_COLS = ['Age', 'Fare', 'SibSp', 'Parch', 'TicketGroupSize']
+
+
 def extract_title(names):
     """Достаёт титул (Mr/Mrs/...) из полного имени, редкие варианты группирует в Rare"""
     title = names.str.extract(r' ([A-Za-z]+)\.')[0]
@@ -37,3 +44,26 @@ def preprocess_data_advanced(df, is_train, artifacts=None):
     df['Sex'] = df['Sex'].map({'male': 0, 'female': 1})
 
     return (df, artifacts) if is_train else df
+
+
+def build_features(train_df, test_df):
+    """Полный цикл фичей для обучения: preprocess_data_advanced + one-hot категорий + масштабирование.
+    Тот же зафиксированный пайплайн, что использовался во всех notebook-экспериментах проекта"""
+    test_passenger_ids = test_df['PassengerId']
+
+    train_df, artifacts = preprocess_data_advanced(train_df, is_train=True)
+    test_df = preprocess_data_advanced(test_df, is_train=False, artifacts=artifacts)
+
+    train_df = pd.get_dummies(train_df, columns=CATEGORICAL_COLS)
+    test_df = pd.get_dummies(test_df, columns=CATEGORICAL_COLS)
+    test_df = test_df.reindex(columns=train_df.drop('Survived', axis=1).columns, fill_value=0)
+
+    scaler = StandardScaler()
+    train_df[SCALE_COLS] = scaler.fit_transform(train_df[SCALE_COLS])
+    test_df[SCALE_COLS] = scaler.transform(test_df[SCALE_COLS])
+
+    X_train = train_df.drop(['Survived'], axis=1)
+    y_train = train_df['Survived']
+    X_test = test_df
+
+    return X_train, y_train, X_test, test_passenger_ids

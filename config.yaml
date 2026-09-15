@@ -1,0 +1,124 @@
+# Какую модель/ансамбль запускать: любой ключ из models или ensembles ниже,
+# либо all - прогонит по CV все модели и ансамбли разом и напечатает сравнительную таблицу (без сабмита)
+model: voting_hard
+
+data:
+  train_path: data/train.csv
+  test_path: data/test.csv
+  submission_path: submission.csv
+
+validation:
+  n_splits: 5
+  random_state: 42
+
+# Базовые модели с гиперпараметрами, подобранными в classic_models_exploration.ipynb / DNN_exploration.ipynb
+models:
+  logreg:
+    params:
+      solver: saga
+      max_iter: 5000
+      random_state: 42
+      C: 1
+      l1_ratio: 0.75
+
+  knn:
+    params:
+      n_neighbors: 5
+      weights: uniform
+      metric: manhattan
+
+  decision_tree:
+    params:
+      criterion: gini
+      max_depth: null
+      max_features: null
+      min_samples_leaf: 5
+      min_samples_split: 2
+      random_state: 42
+
+  random_forest:
+    params:
+      n_estimators: 300
+      max_depth: 10
+      max_features: sqrt
+      criterion: entropy
+      min_samples_leaf: 1
+      random_state: 42
+      n_jobs: -1
+
+  xgboost:
+    params:
+      n_estimators: 300
+      max_depth: 3
+      learning_rate: 0.05
+      subsample: 1.0
+      colsample_bytree: 0.7
+      random_state: 42
+
+  lightgbm:
+    params:
+      n_estimators: 300
+      max_depth: -1
+      learning_rate: 0.01
+      subsample: 0.7
+      colsample_bytree: 0.7
+      random_state: 42
+      verbosity: -1
+
+  catboost:
+    params:
+      iterations: 300
+      depth: 4
+      learning_rate: 0.03
+      l2_leaf_reg: 1
+      random_state: 42
+      verbose: false
+      allow_writing_files: false
+      thread_count: -1
+
+  dnn_embedding:
+    params:
+      embedding_dim: 2
+      hidden_dim: 16
+      lr: 0.001
+      n_epochs: 50
+      batch_size: 32
+      random_state: 42
+
+# Мета-модели для stacking-ансамблей
+final_estimators:
+  logreg_noreg:
+    params:
+      C: .inf
+      max_iter: 5000
+      random_state: 42
+
+  ridge:
+    params:
+      random_state: 42
+
+# Ансамбли из classic_models_exploration/ensembles.ipynb: лучшие 5 базовых моделей
+# (logreg, random_forest, xgboost, lightgbm, catboost). knn/decision_tree/dnn_embedding
+# слабее по отдельности и не улучшают ансамбль, поэтому в base_models не входят
+ensembles:
+  voting_hard:
+    type: voting
+    voting: hard
+    base_models: [logreg, random_forest, xgboost, lightgbm, catboost]
+
+  voting_soft:
+    type: voting
+    voting: soft
+    base_models: [logreg, random_forest, xgboost, lightgbm, catboost]
+
+  stacking_logreg:
+    type: stacking
+    final_estimator: logreg_noreg
+    cv: 3
+    base_models: [logreg, random_forest, xgboost, lightgbm, catboost]
+
+  stacking_ridge:
+    type: stacking
+    final_estimator: ridge
+    cv: 3
+    base_models: [logreg, random_forest, xgboost, lightgbm, catboost]
